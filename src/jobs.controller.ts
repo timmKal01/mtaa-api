@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
 type Job = {
@@ -11,7 +19,9 @@ type Job = {
   budgetKes: number | null;
   customerClerkId?: string;
   customerEmail?: string;
-  status: 'posted';
+  providerClerkId?: string;
+  providerEmail?: string;
+  status: 'posted' | 'accepted';
   createdAt: string;
 };
 
@@ -38,6 +48,24 @@ export class JobsController {
 
   @Get(':id')
   one(@Param('id') id: string) {
-    return jobs.find((j) => j.id === id) ?? { message: 'Not found' };
+    const job = jobs.find((j) => j.id === id);
+    if (!job) throw new NotFoundException('Not found');
+    return job;
+  }
+
+  @Patch(':id/accept')
+  accept(
+    @Param('id') id: string,
+    @Body() body: { providerClerkId?: string; providerEmail?: string },
+  ) {
+    const job = jobs.find((j) => j.id === id);
+    if (!job) throw new NotFoundException('Not found');
+    if (job.status !== 'posted') {
+      return { message: 'Job already accepted', job };
+    }
+    job.status = 'accepted';
+    job.providerClerkId = body.providerClerkId;
+    job.providerEmail = body.providerEmail;
+    return job;
   }
 }
