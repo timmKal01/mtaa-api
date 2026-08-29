@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
+type JobStatus = 'posted' | 'accepted' | 'picked_up' | 'delivered';
+
 type Job = {
   id: string;
   type: string;
@@ -21,11 +23,17 @@ type Job = {
   customerEmail?: string;
   providerClerkId?: string;
   providerEmail?: string;
-  status: 'posted' | 'accepted';
+  status: JobStatus;
   createdAt: string;
 };
 
 const jobs: Job[] = [];
+
+function getJob(id: string) {
+  const job = jobs.find((j) => j.id === id);
+  if (!job) throw new NotFoundException('Not found');
+  return job;
+}
 
 @Controller('jobs')
 export class JobsController {
@@ -48,9 +56,7 @@ export class JobsController {
 
   @Get(':id')
   one(@Param('id') id: string) {
-    const job = jobs.find((j) => j.id === id);
-    if (!job) throw new NotFoundException('Not found');
-    return job;
+    return getJob(id);
   }
 
   @Patch(':id/accept')
@@ -58,14 +64,33 @@ export class JobsController {
     @Param('id') id: string,
     @Body() body: { providerClerkId?: string; providerEmail?: string },
   ) {
-    const job = jobs.find((j) => j.id === id);
-    if (!job) throw new NotFoundException('Not found');
+    const job = getJob(id);
     if (job.status !== 'posted') {
-      return { message: 'Job already accepted', job };
+      return { message: 'Job cannot be accepted', job };
     }
     job.status = 'accepted';
     job.providerClerkId = body.providerClerkId;
     job.providerEmail = body.providerEmail;
+    return job;
+  }
+
+  @Patch(':id/pickup')
+  pickup(@Param('id') id: string) {
+    const job = getJob(id);
+    if (job.status !== 'accepted') {
+      return { message: 'Job cannot be picked up', job };
+    }
+    job.status = 'picked_up';
+    return job;
+  }
+
+  @Patch(':id/deliver')
+  deliver(@Param('id') id: string) {
+    const job = getJob(id);
+    if (job.status !== 'picked_up') {
+      return { message: 'Job cannot be delivered', job };
+    }
+    job.status = 'delivered';
     return job;
   }
 }
