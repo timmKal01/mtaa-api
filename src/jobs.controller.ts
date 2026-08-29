@@ -7,90 +7,96 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-
-type JobStatus = 'posted' | 'accepted' | 'picked_up' | 'delivered';
-
-type Job = {
-  id: string;
-  type: string;
-  what: string;
-  pickup: string;
-  dropoff: string;
-  when: string;
-  budgetKes: number | null;
-  customerClerkId?: string;
-  customerEmail?: string;
-  providerClerkId?: string;
-  providerEmail?: string;
-  status: JobStatus;
-  createdAt: string;
-};
-
-const jobs: Job[] = [];
-
-function getJob(id: string) {
-  const job = jobs.find((j) => j.id === id);
-  if (!job) throw new NotFoundException('Not found');
-  return job;
-}
+import { JobStatus } from '@prisma/client';
+import { PrismaService } from './prisma.service.js';
 
 @Controller('jobs')
 export class JobsController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Post()
-  create(@Body() body: Omit<Job, 'id' | 'status' | 'createdAt'>) {
-    const job: Job = {
-      ...body,
-      id: randomUUID(),
-      status: 'posted',
-      createdAt: new Date().toISOString(),
-    };
-    jobs.unshift(job);
-    return job;
+  create(
+    @Body()
+    body: {
+      type: string;
+      what: string;
+      pickup: string;
+      dropoff: string;
+      when: string;
+      budgetKes?: number | null;
+      customerClerkId?: string;
+      customerEmail?: string;
+    },
+  ) {
+    return this.prisma.job.create({
+      data: {
+        type: body.type,
+        what: body.what,
+        pickup: body.pickup,
+        dropoff: body.dropoff,
+        when: body.when,
+        budgetKes: body.budgetKes ?? null,
+        customerClerkId: body.customerClerkId,
+        customerEmail: body.customerEmail,
+      },
+    });
   }
 
   @Get()
   list() {
-    return jobs;
+    return this.prisma.job.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   @Get(':id')
-  one(@Param('id') id: string) {
-    return getJob(id);
+  async one(@Param('id') id: string) {
+    const job = await this.prisma.job.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('Not found');
+    return job;
   }
 
   @Patch(':id/accept')
-  accept(
+  async accept(
     @Param('id') id: string,
     @Body() body: { providerClerkId?: string; providerEmail?: string },
   ) {
-    const job = getJob(id);
-    if (job.status !== 'posted') {
+    const job = await this.prisma.job.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('Not found');
+    if (job.status !== JobStatus.posted) {
       return { message: 'Job cannot be accepted', job };
     }
-    job.status = 'accepted';
-    job.providerClerkId = body.providerClerkId;
-    job.providerEmail = body.providerEmail;
-    return job;
+    return this.prisma.job.update({
+      where: { id },
+      data: {
+        status: JobStatus.accepted,
+        providerClerkId: body.providerClerkId,
+        providerEmail: body.providerEmail,
+      },
+    });
   }
 
   @Patch(':id/pickup')
-  pickup(@Param('id') id: string) {
-    const job = getJob(id);
-    if (job.status !== 'accepted') {
+  async pickup(@Param('id') id: string) {
+    const job = await this.prisma.job.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('Not found');
+    if (job.status !== JobStatus.accepted) {
       return { message: 'Job cannot be picked up', job };
     }
-    job.status = 'picked_up';
-    return job;
+    return this.prisma.job.update({
+      where: { id },
+      data: { status: JobStatus.picked_up },
+    });
   }
 
   @Patch(':id/deliver')
-  deliver(@Param('id') id: string) {
-    const job = getJob(id);
-    if (job.status !== 'picked_up') {
+  async deliver(@Param('id') id: string) {
+    const job = await this.prisma.job.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('Not found');
+    if (job.status !== JobStatus.picked_up) {
       return { message: 'Job cannot be delivered', job };
     }
-    job.status = 'delivered';
-    return job;
+    return this.prisma.job.update({
+      where: { id },
+      data: { status: JobStatus.delivered },
+    });
   }
 }
