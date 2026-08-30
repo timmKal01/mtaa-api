@@ -28,4 +28,6 @@ model Job {
   providerEmail    String?
   status           JobStatus @default(posted)
   createdAt        DateTime  @default(now())
+  paymentStatus    String    @default("unpaid")
+  mpesaReceipt     String?
 }

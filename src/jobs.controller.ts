@@ -16,17 +16,17 @@ export class JobsController {
 
   @Post()
   create(
-    @Body()
-    body: {
-      type: string;
-      what: string;
-      pickup: string;
-      dropoff: string;
-      when: string;
-      budgetKes?: number | null;
-      customerClerkId?: string;
-      customerEmail?: string;
-    },
+      @Body()
+      body: {
+        type: string;
+        what: string;
+        pickup: string;
+        dropoff: string;
+        when: string;
+        budgetKes?: number | null;
+        customerClerkId?: string;
+        customerEmail?: string;
+      },
   ) {
     return this.prisma.job.create({
       data: {
@@ -56,8 +56,8 @@ export class JobsController {
 
   @Patch(':id/accept')
   async accept(
-    @Param('id') id: string,
-    @Body() body: { providerClerkId?: string; providerEmail?: string },
+      @Param('id') id: string,
+      @Body() body: { providerClerkId?: string; providerEmail?: string },
   ) {
     const job = await this.prisma.job.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('Not found');
@@ -100,6 +100,28 @@ export class JobsController {
     return this.prisma.job.update({
       where: { id },
       data: { status: JobStatus.delivered },
+    });
+  }
+
+  @Patch(':id/pay')
+  async pay(
+      @Param('id') id: string,
+      @Body() body: { customerClerkId?: string },
+  ) {
+    const job = await this.prisma.job.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('Not found');
+    if (body.customerClerkId && body.customerClerkId !== job.customerClerkId) {
+      return { message: 'Only the customer can pay', job };
+    }
+    if (job.paymentStatus === 'paid') {
+      return { message: 'Already paid', job };
+    }
+    return this.prisma.job.update({
+      where: { id },
+      data: {
+        paymentStatus: 'paid',
+        mpesaReceipt: `STUB-${Date.now()}`,
+      },
     });
   }
 }
