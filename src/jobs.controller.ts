@@ -64,6 +64,9 @@ export class JobsController {
     if (job.status !== JobStatus.posted) {
       return { message: 'Job cannot be accepted', job };
     }
+    if (body.providerClerkId && body.providerClerkId === job.customerClerkId) {
+      return { message: 'You cannot accept your own job', job };
+    }
     return this.prisma.job.update({
       where: { id },
       data: {
